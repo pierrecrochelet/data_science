@@ -1,10 +1,12 @@
 import numpy as np
 
-counter = 0
-
 my_array = np.random.rand(100)
 """
-
+implementation of quicksort. Select an element (pivot) of the array and put all smaller elements to the left and all bigger elements to the right.
+This has O(n^2) worst-case complexity. Worst case happens when the selected pivot is the smallest or biggest element. 
+The complexity equation becomes O(n) = O(n-1)+c(n) where c(n) has complexity O(n). If this happens recursively, we get a complexity of O(n^2) in the end.
+Choosing the pivot at random minimizes the risk of encountering the worst-case scenario repeatedly. 
+Therefor the complexity equation approches O(n) = 2*O(n/2)+c(n) where c(n) has comlpexity O(n). In the end, it approaches a complexity of O(n log(n))
 """
 
 def partition(array, low, high):
