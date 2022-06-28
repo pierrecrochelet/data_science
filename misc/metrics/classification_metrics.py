@@ -235,15 +235,3 @@ def brier_score(true, predicted):
         print(f"True and predicted must have same length but found {true.shape[0]} and {predicted.shape[0]}")
         return
     return np.sum((true-predicted)**2)/true.shape[0]
-
-
-
-
-
-
-
-from sklearn.metrics import brier_score_loss
-y_true = np.random.randint(2, size=1000)
-y_pred = np.random.rand(1000)
-print(brier_score_loss(y_true, y_pred))
-print(brier_score(y_true, y_pred))
