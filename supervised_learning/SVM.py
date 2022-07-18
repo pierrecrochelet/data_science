@@ -1,42 +1,12 @@
 import sys
 sys.path.append("../misc/scalers")
+sys.path.append("../misc/metrics")
 
 import numpy as np
 import pandas as pd
 import normal_scaler
 from copy import deepcopy
-
-"""
-First, load the dataset and prepare the data by transforming quality in numerical data. 
-For SVM, it is easier if the labels are -1 and 1 instead of 0 and 1.
-Also split the dataset in 66:33 for training:testing
-"""
-
-dataset = pd.read_csv("../misc/datasets/wine.csv")
-for i in range(0, dataset.shape[0]):
-    if dataset.iloc[i,-1]=="good":
-        dataset.iloc[i,-1]=1
-    else:
-        dataset.iloc[i,-1]=-1
-
-X = np.asarray(dataset)[:, :-1]
-y = np.asarray(dataset)[:, -1]
-
-split = int(X.shape[0]*(66/100))
-
-X_train = X[:split]
-y_train = y[:split]
-X_test = X[split:]
-y_test = y[split:]
-print(f"There are {X_train.shape[0]} data for training and {X_test.shape[0]} data for testing")
-print(f"There are {X_train.shape[1]} features in each")
-
-"""
-Scale data with custom made normal scaler
-"""
-
-params = normal_scaler.find_parameters(X_train)
-normal_scaler.scale_data(X_train, params)
+from classification_metrics import compute_recall, compute_precision, compute_f1_score
 
 """
 Define cost function used where C is the penality of a wrongly classified term. Bigger C makes it hard-margin and lower C makes soft-margin. 
@@ -93,15 +63,19 @@ def gradient_descent(X, y, batch_size=1, epochs=100, learning_rate=0.0001, C=5, 
     weights = np.random.rand(x_train.shape[1]+1)
     #weights = np.zeros(x_train.shape[1]+1)
     prev_cost = float("inf")
-    for epoch in range(0, epochs):
+    for _ in range(0, epochs):
+
+        # Shuffle the arrays to get different subsets each iterations, usefull when batch_size>1
         inter = np.concatenate((x_train, y_train.reshape(-1, 1)), axis=1)
         np.random.shuffle(inter)
         x_train = inter[:,:-1]
         y_train = inter[:,-1]
         for i in range(0, x_train.shape[0], batch_size):
+            # Update weights according to gradient of cost function
             dw = cost_gradient(weights, x_train[i:i+batch_size], y_train[i:i+batch_size], C)
             weights = weights - (learning_rate * dw)
         
+        # Early stopping criterion if the value of the cost function doesn't change much. Can be prevented by setting cost_threshold=0
         cost = cost_function(weights, x_train, y_train, C)
         if np.abs(cost-prev_cost) < cost_threshold * prev_cost:
             return weights
@@ -126,22 +100,42 @@ Therefore the results could be better if one was interested in playing with the 
 
 if __name__=="__main__":
 
+    """
+    First, load the dataset and prepare the data by transforming quality in numerical data. 
+    For SVM, it is easier if the labels are -1 and 1 instead of 0 and 1.
+    Also split the dataset in 66:33 for training:testing
+    """
+
+    dataset = pd.read_csv("../misc/datasets/wine.csv")
+    for i in range(0, dataset.shape[0]):
+        if dataset.iloc[i,-1]=="good":
+            dataset.iloc[i,-1]=1
+        else:
+            dataset.iloc[i,-1]=-1
+
+    X = np.asarray(dataset)[:, :-1]
+    y = np.asarray(dataset)[:, -1]
+
+    split = int(X.shape[0]*(66/100))
+
+    X_train = X[:split]
+    y_train = y[:split]
+    X_test = X[split:]
+    y_test = y[split:]
+    print(f"There are {X_train.shape[0]} data for training and {X_test.shape[0]} data for testing")
+    print(f"There are {X_train.shape[1]} features in each")
+
+    """
+    Scale data with custom made normal scaler
+    """
+
+    params = normal_scaler.find_parameters(X_train)
+    normal_scaler.scale_data(X_train, params)
+
     weights = gradient_descent(X_train, y_train)
     y_pred = predict_values(weights, X_test)
-    Tp = 0
-    Tn = 0
-    Fp = 0
-    Fn = 0
-    for i in range(0, y_pred.shape[0]):
-        if y_pred[i]==1 and y_test[i]==1:
-            Tp += 1
-        elif y_pred[i]==-1 and y_test[i]==-1:
-            Tn += 1
-        elif y_pred[i]==1 and y_test[i]==-1:
-            Fn += 1
-        elif y_pred[i]==-1 and y_test[i]==1:
-            Fp += 1
-    precision = Tp/(Tp+Fp)
-    recall = Tp/(Tp+Fn)
-    f1 = (2 * (precision * recall))/(precision+recall)
+    print(y_test, y_pred)
+    precision = compute_precision(y_test, y_pred, true_val = 1, false_val = -1)
+    recall = compute_recall(y_test, y_pred, true_val = 1, false_val = -1)
+    f1 = compute_f1_score(y_test, y_pred, true_val = 1, false_val = -1)
     print(f"Precision: {precision}\nRecall: {recall}\nf1-score: {f1}")
