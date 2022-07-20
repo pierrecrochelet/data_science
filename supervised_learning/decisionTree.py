@@ -6,77 +6,7 @@ import pandas as pd
 from classification_metrics import compute_recall, compute_precision, compute_f1_score
 
 """
-Find the best value to create a split in the tree.
-This will differ based on the type of the value considered.
-If the value is categorical, then loop on all the categorical values and calculate information gain then return the value which maximizes the information gain.
-If the value is numercial, ...
-"""
-
-def findSplit(X, y, dataType):
-    for i in range(0, X.shape[0]):
-
-        chosen = None
-        best_information_gain = 0
-
-        if dataType=="Categorical":
-
-            # Calculate base entropy
-            ones = np.argwhere(y==1).shape[0]
-            zeros = y.shape[0]-ones
-            base_entropy = -( ones*np.log2(ones) + zeros*np.log2(zeros) )
-            values = np.unique(X)
-            
-            # Loop over all values
-            for value in values:
-
-                # Calculate entropy in each split
-                ones = np.argwhere(y[X[i]==value]==1).shape[0]
-                zeros = y[X==values].shape[0]-ones
-                entropy1 = (-( ones*np.log2(ones) + zeros*np.log2(zeros) )) * (y[X==values].shape[0]/y.shape[0])
-                ones = np.argwhere(y[X!=value]==1).shape[0]
-                zeros = y[X!=values].shape[0]-ones
-                entropy2 = -( ones*np.log2(ones) + zeros*np.log2(zeros) ) * (y[X!=values].shape[0]/y.shape[0])
-
-                # Calculate information gain
-                information_gain = base_entropy-(entropy1+entropy2)
-
-                # Update best information gain and returned value.
-                if information_gain>best_information_gain:
-                    best_information_gain = information_gain
-                    chosen = (i, value)
-        else:
-
-            # Calculate base entropy
-            ones = np.argwhere(y==1).shape[0]
-            zeros = y.shape[0]-ones
-            base_entropy = -( ones*np.log2(ones) + zeros*np.log2(zeros) )
-            values = np.unique(X)
-
-            # Loop over threshold values
-            diff_vals = np.unique(X)
-            for j in range(1, len(diff_vals)):
-                threshold = (diff_vals[j]-diff_vals[j-1])/2
-
-                # Calculate entropy in each split
-                ones = np.argwhere(y[X>threshold]==1).shape[0]
-                zeros = y[X>threshold].shape[0]-ones
-                entropy1 = (-( ones*np.log2(ones) + zeros*np.log2(zeros) )) * (y[X>threshold].shape[0]/y.shape[0])
-                ones = np.argwhere(y[X<threshold]==1).shape[0]
-                zeros = y[X<threshold].shape[0]-ones
-                entropy1 = (-( ones*np.log2(ones) + zeros*np.log2(zeros) )) * (y[X<threshold].shape[0]/y.shape[0])
-
-                # Calculate information gain
-                information_gain = base_entropy-(entropy1+entropy2)
-                
-                # Update best information gain and returned value
-                if information_gain>best_information_gain:
-                    best_information_gain = information_gain
-                    chosen = (i, value)
-    
-    return chosen
-
-"""
-Define the decision tree as nodes that can have up to two children.
+Define the decision tree as nodes that can have up to two children. This decision tree works for both numerical and categorical features at the same time.
 """
 class Node:
 
@@ -86,7 +16,7 @@ class Node:
     The node has two children: left and right. 
     The featureSplit and featureSplitThreshold attributes are calculated in the findSplit function and represent the best feature and value to split this node.
     """
-    def __init__(self, X, y, featureTypes=None):
+    def __init__(self, X, y, featureTypes=None, depth=0, max_depth=None, randomSeed=None, samples_to_split=None):
         self.X = X
         self.y = y
         if featureTypes==None:
@@ -97,24 +27,34 @@ class Node:
             self.featureTypes = featureTypes
         ones = np.argwhere(y==1).shape[0]
         zeros = y.shape[0]-ones
-        if ones==y.shape[0] or ones==0:
-            self.leaf=True
-        else:
-            self.leaf=False
         if ones>zeros:
             self.predictionValue = 1
         else:
             self.predictionValue = 0
-        ones = ones/y.shape[0]
-        zeros = zeros/y.shape[0]
         if ones==0 or zeros==0:
             self.entropy=0
         else:
-            self.entropy = -( (ones*np.log2(ones)) + (zeros*np.log2(zeros)) )
+            self.entropy = -( ((ones/y.shape[0])*np.log2(ones/y.shape[0])) + ((zeros/y.shape[0])*np.log2(zeros/y.shape[0])) )
         self.left = None
         self.right = None
         self.featureSplit = None
         self.featureSplitThreshold = None
+        self.depth = depth
+        self.maxDepth = max_depth
+        self.SubtreeDepth = 1
+        if randomSeed!=None:
+            np.random.seed(randomSeed)
+        if samples_to_split!=None:
+            if samples_to_split>0 and samples_to_split<1:
+                self.samplesToSplit = int(samples_to_split*X.shape[0])
+            else:
+                self.samplesToSplit = int(samples_to_split)
+        else:
+            self.samplesToSplit=None
+        if ones==y.shape[0] or ones==0 or (max_depth!=None and depth>=max_depth) or (self.samplesToSplit!=None and self.samplesToSplit>X.shape[0]):
+            self.leaf=True
+        else:
+            self.leaf=False
 
     """
     Loops through all features and all values (or threshold values) in the data to find the best split. 
@@ -122,7 +62,7 @@ class Node:
     """
     def findSplit(self):
 
-        chosen = None
+        chosen = []
         best_information_gain = 0
 
         for i in range(0, self.X.shape[1]):
@@ -157,7 +97,10 @@ class Node:
                     # Update best information gain and returned value.
                     if information_gain>best_information_gain:
                         best_information_gain = information_gain
-                        chosen = (i, value)
+                        chosen = [(i, value)]
+                    if information_gain==best_information_gain:
+                        chosen.append((i, value))
+
             else:
                 for j in range(1, len(values)):
                     threshold = values[j-1] + ((values[j]-values[j-1])/2)
@@ -187,8 +130,17 @@ class Node:
                     # Update best information gain and returned value
                     if information_gain>best_information_gain:
                         best_information_gain = information_gain
-                        chosen = (i, threshold)
-
+                        chosen = [(i, threshold)]
+                    if information_gain==best_information_gain:
+                        chosen.append((i, threshold))
+        try:
+            chosen = chosen[np.random.randint(len(chosen))]
+        except ValueError:
+            print(chosen)
+            print(self.X)
+            print(self.y)
+            print(self.leaf)
+            exit(0)
         self.featureSplit = chosen[0]
         self.featureSplitThreshold = chosen[1]
 
@@ -212,13 +164,16 @@ class Node:
                 X_newRight = self.X[self.X[:,self.featureSplit]>self.featureSplitThreshold]
                 y_newRight = self.y[self.X[:,self.featureSplit]>self.featureSplitThreshold]
 
-            node1 = Node(X_newLeft, y_newLeft, self.featureTypes)
-            self.left = node1
-            node1.expand()
+            nodeLeft = Node(X=X_newLeft, y=y_newLeft, featureTypes=self.featureTypes, depth=self.depth+1, max_depth=self.maxDepth, samples_to_split=self.samplesToSplit)
+            self.left = nodeLeft
+            depthTreeLeft = nodeLeft.expand()
 
-            node2 = Node(X_newRight, y_newRight, self.featureTypes)
-            self.right = node2
-            node2.expand()
+            nodeRight = Node(X=X_newRight, y=y_newRight, featureTypes=self.featureTypes, depth=self.depth+1, max_depth=self.maxDepth, samples_to_split=self.samplesToSplit)
+            self.right = nodeRight
+            depthTreeRight = nodeRight.expand()
+
+            self.SubtreeDepth = max(depthTreeLeft, depthTreeRight)
+        return self.SubtreeDepth + 1
 
     """
     Goes through the tree to find the leaf giving the prediction for this value
@@ -249,6 +204,12 @@ class Node:
             predictions[i] = self.predict_value(to_predict[i])
         return predictions
 
+    """
+    Prints some information on the tree such as the max depth
+    """
+    def printInfo(self):
+        print(f"The tree has a depth of {self.SubtreeDepth}.")
+
 if __name__=="__main__":
 
     """
@@ -264,8 +225,6 @@ if __name__=="__main__":
 
     X = np.asarray(dataset)[:, :-1]
     y = np.asarray(dataset)[:, -1]
-    test = ["test"]*X.shape[0]
-    X = np.concatenate((X, np.array(test).reshape(-1, 1)), axis=1)
     split = int(X.shape[0]*(66/100))
 
     X_train = X[:split]
@@ -278,7 +237,8 @@ if __name__=="__main__":
     decisionTree = Node(X_train, y_train)
     decisionTree.expand()
     y_pred = decisionTree.predict(X_test)
-
+    decisionTree.printInfo()
+    
     precision = compute_precision(y_test, y_pred)
     recall = compute_recall(y_test, y_pred)
     f1 = compute_f1_score(y_test, y_pred)
