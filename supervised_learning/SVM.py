@@ -9,7 +9,7 @@ from copy import deepcopy
 from classification_metrics import compute_recall, compute_precision, compute_f1_score
 
 """
-Define cost function used where C is the penality of a wrongly classified term. Bigger C makes it hard-margin and lower C makes soft-margin. 
+Define cost function used where C is the penalty of a wrongly classified term. Bigger C makes it hard-margin and lower C makes soft-margin. 
 Hard margin tries to absolutely have no error making the space between the support vector smaller. As a result it will usualize perform worse when generalizing.
 Soft margin accepts errors to some extent (as defined with the value C) and finds a compromise between having a low number of errors and a big space between the support vectors. 
 As a result it will usually perform better when generalyzing

@@ -6,6 +6,18 @@ import pandas as pd
 from classification_metrics import compute_recall, compute_precision, compute_f1_score
 
 """
+Defines an early stopping criterion for the trees
+"""
+
+def allSameElements(array):
+    if len(array)==1:
+        return True
+    for i in range(1, array.shape[0]):
+        if not np.array_equal(array[0], array[i]):
+            return False
+    return True
+
+"""
 Define the decision tree as nodes that can have up to two children. This decision tree works for both numerical and categorical features at the same time.
 """
 class Node:
@@ -16,7 +28,7 @@ class Node:
     The node has two children: left and right. 
     The featureSplit and featureSplitThreshold attributes are calculated in the findSplit function and represent the best feature and value to split this node.
     """
-    def __init__(self, X, y, featureTypes=None, depth=0, max_depth=None, randomSeed=None, samples_to_split=None):
+    def __init__(self, X, y, featureTypes=None, measure="Entropy", depth=0, max_depth=None, randomSeed=None, samples_to_split=None):
         self.X = X
         self.y = y
         if featureTypes==None:
@@ -25,16 +37,23 @@ class Node:
                 self.featureTypes.append("Categorical" if isinstance(X[0,i], str) else "Numerical")
         else:
             self.featureTypes = featureTypes
+        self.measure = measure
         ones = np.argwhere(y==1).shape[0]
         zeros = y.shape[0]-ones
         if ones>zeros:
             self.predictionValue = 1
         else:
             self.predictionValue = 0
-        if ones==0 or zeros==0:
-            self.entropy=0
+        if measure=="Entropy":
+            if ones==0 or zeros==0:
+                self.measureValue=0
+            else:
+                self.measureValue = -( ((ones/y.shape[0])*np.log2(ones/y.shape[0])) + ((zeros/y.shape[0])*np.log2(zeros/y.shape[0])) )
+        elif measure=="Gini":
+            self.measureValue = (ones/y.shape[0]) * (1 - (ones/y.shape[0])) + (zeros/y.shape[0]) * (1 - (zeros/y.shape[0]))
         else:
-            self.entropy = -( ((ones/y.shape[0])*np.log2(ones/y.shape[0])) + ((zeros/y.shape[0])*np.log2(zeros/y.shape[0])) )
+            print(f"Unknown measure Measure, please use either Gini or Entropy as those are the only ones implemented for now")
+            exit(0)
         self.left = None
         self.right = None
         self.featureSplit = None
@@ -51,19 +70,19 @@ class Node:
                 self.samplesToSplit = int(samples_to_split)
         else:
             self.samplesToSplit=None
-        if ones==y.shape[0] or ones==0 or (max_depth!=None and depth>=max_depth) or (self.samplesToSplit!=None and self.samplesToSplit>X.shape[0]):
+        if allSameElements(self.X) or ones==y.shape[0] or ones==0 or (max_depth!=None and depth>=max_depth) or (self.samplesToSplit!=None and self.samplesToSplit>X.shape[0]):
             self.leaf=True
         else:
             self.leaf=False
 
     """
-    Loops through all features and all values (or threshold values) in the data to find the best split. 
+    Loops through all features and all values (or threshold values) in the data to find the best split. If mutliple are found, choose one at random.
     The threshold values for numerical features are calculating by sorting all unique values and then taking the average of each pair.
     """
     def findSplit(self):
 
         chosen = []
-        best_information_gain = 0
+        bestImprovement = 0
 
         for i in range(0, self.X.shape[1]):
 
@@ -72,71 +91,90 @@ class Node:
             if self.featureTypes[i]=="Categorical":
                 for value in values:
 
-                    # Calculate entropy in each split
+                    # Calculate measure value in each split
                     ones = np.argwhere(self.y[self.X[:,i]==value]==1).shape[0]
                     zeros = self.y[self.X[:,i]==values].shape[0]-ones
-                    if ones==0 or zeros==0:
-                        entropy1 = 0
-                    else:
+                    if self.measure=="Entropy":
+                        if ones==0 or zeros==0:
+                            measureLeft = 0
+                        else:
+                            ones = ones/self.y[self.X[:,i]==values].shape[0]
+                            zeros = zeros/self.y[self.X[:,i]==values].shape[0]
+                            measureLeft = (-( ones*np.log2(ones) + zeros*np.log2(zeros) )) * (self.y[self.X[:,i]==values].shape[0]/self.y.shape[0])
+                    elif self.measure=="Gini":
                         ones = ones/self.y[self.X[:,i]==values].shape[0]
                         zeros = zeros/self.y[self.X[:,i]==values].shape[0]
-                        entropy1 = (-( ones*np.log2(ones) + zeros*np.log2(zeros) )) * (self.y[self.X[:,i]==values].shape[0]/self.y.shape[0])
+                        measureLeft = ( ones*(1-ones)+ zeros*(1-zeros) ) * (self.y[self.X[:,i]==values].shape[0]/self.y.shape[0])
 
                     ones = np.argwhere(self.y[self.X[:,i]!=value]==1).shape[0]
                     zeros = self.y[self.X[:,i]!=values].shape[0]-ones
-                    if ones==0 or zeros==0:
-                        entropy2 = 0
-                    else:
+                    if self.measure=="Entropy":
+                        if ones==0 or zeros==0:
+                            measureRight = 0
+                        else:
+                            ones = ones/self.y[self.X[:,i]!=values].shape[0]
+                            zeros = zeros/self.y[self.X[:,i]!=values].shape[0]
+                            measureRight = -( ones*np.log2(ones) + zeros*np.log2(zeros) ) * (self.y[self.X[:,i]!=values].shape[0]/self.y.shape[0])
+                    elif self.measure=="Gini":
                         ones = ones/self.y[self.X[:,i]!=values].shape[0]
                         zeros = zeros/self.y[self.X[:,i]!=values].shape[0]
-                        entropy2 = -( ones*np.log2(ones) + zeros*np.log2(zeros) ) * (self.y[self.X[:,i]!=values].shape[0]/self.y.shape[0])
+                        measureRight = ( ones*(1-ones)+ zeros*(1-zeros) ) * (self.y[self.X[:,i]!=values].shape[0]/self.y.shape[0])
                         
-                    # Calculate information gain
-                    information_gain = self.entropy-(entropy1+entropy2)
+                    # Calculate measure improvement
+                    measureImprovement = self.measureValue-(measureLeft+measureRight)
 
-                    # Update best information gain and returned value.
-                    if information_gain>best_information_gain:
-                        best_information_gain = information_gain
+                    # Update best improvement and returned value.
+                    if measureImprovement>bestImprovement:
+                        bestImprovement = measureImprovement
                         chosen = [(i, value)]
-                    if information_gain==best_information_gain:
+                    if measureImprovement==bestImprovement:
                         chosen.append((i, value))
 
             else:
                 for j in range(1, len(values)):
                     threshold = values[j-1] + ((values[j]-values[j-1])/2)
 
-                    # Calculate entropy in each split
+                    # Calculate measure value in each split
                     ones = np.argwhere(self.y[self.X[:,i]>threshold]==1).shape[0]
                     zeros = self.y[self.X[:,i]>threshold].shape[0]-ones
-                    if ones==0 or zeros==0:
-                        entropy1 = 0
-                    else:
+                    if self.measure=="Entropy":
+                        if ones==0 or zeros==0:
+                            measureLeft = 0
+                        else:
+                            ones = ones/self.y[self.X[:,i]>threshold].shape[0]
+                            zeros = zeros/self.y[self.X[:,i]>threshold].shape[0]
+                            measureLeft = (-( ones*np.log2(ones) + zeros*np.log2(zeros) )) * (self.y[self.X[:,i]>threshold].shape[0]/self.y.shape[0])
+                    elif self.measure=="Gini":
                         ones = ones/self.y[self.X[:,i]>threshold].shape[0]
                         zeros = zeros/self.y[self.X[:,i]>threshold].shape[0]
-                        entropy1 = (-( ones*np.log2(ones) + zeros*np.log2(zeros) )) * (self.y[self.X[:,i]>threshold].shape[0]/self.y.shape[0])
+                        measureLeft = ( ones*(1-ones)+ zeros*(1-zeros) ) * (self.y[self.X[:,i]>threshold].shape[0]/self.y.shape[0])
 
                     ones = np.argwhere(self.y[self.X[:,i]<threshold]==1).shape[0]
                     zeros = self.y[self.X[:,i]<threshold].shape[0]-ones
-                    if ones==0 or zeros==0:
-                        entropy2 = 0
-                    else:
+                    if self.measure=="Entropy":
+                        if ones==0 or zeros==0: # np.log2 throws exception if it recieves 0
+                            measureRight = 0
+                        else:
+                            ones = ones/self.y[self.X[:,i]<threshold].shape[0]
+                            zeros = zeros/self.y[self.X[:,i]<threshold].shape[0]
+                            measureRight = (-( ones*np.log2(ones) + zeros*np.log2(zeros) )) * (self.y[self.X[:,i]<threshold].shape[0]/self.y.shape[0])
+                    elif self.measure=="Gini":
                         ones = ones/self.y[self.X[:,i]<threshold].shape[0]
                         zeros = zeros/self.y[self.X[:,i]<threshold].shape[0]
-                        entropy2 = (-( ones*np.log2(ones) + zeros*np.log2(zeros) )) * (self.y[self.X[:,i]<threshold].shape[0]/self.y.shape[0])
+                        measureRight = ( ones*(1-ones)+ zeros*(1-zeros) ) * (self.y[self.X[:,i]<threshold].shape[0]/self.y.shape[0])
 
-                    # Calculate information gain
-                    information_gain = self.entropy-(entropy1+entropy2)
+                    # Calculate measure improvement
+                    measureImprovement = self.measureValue-(measureLeft+measureRight)
                     
-                    # Update best information gain and returned value
-                    if information_gain>best_information_gain:
-                        best_information_gain = information_gain
+                    # Update best improvement and returned value.
+                    if measureImprovement>bestImprovement:
+                        bestImprovement = measureImprovement
                         chosen = [(i, threshold)]
-                    if information_gain==best_information_gain:
+                    if measureImprovement==bestImprovement:
                         chosen.append((i, threshold))
         try:
             chosen = chosen[np.random.randint(len(chosen))]
         except ValueError:
-            print(chosen)
             print(self.X)
             print(self.y)
             print(self.leaf)
@@ -152,23 +190,23 @@ class Node:
         if self.leaf==False:
 
             self.findSplit()
-
+            
             if self.featureTypes[self.featureSplit] == "Categorical":
                 X_newLeft = self.X[self.X[:,self.featureSplit]==self.featureSplitThreshold]
                 y_newLeft = self.y[self.X[:,self.featureSplit]==self.featureSplitThreshold]
                 X_newRight = self.X[self.X[:,self.featureSplit]!=self.featureSplitThreshold]
                 y_newRight = self.y[self.X[:,self.featureSplit]!=self.featureSplitThreshold]
             else:
-                X_newLeft = self.X[self.X[:,self.featureSplit]<self.featureSplitThreshold]
-                y_newLeft = self.y[self.X[:,self.featureSplit]<self.featureSplitThreshold]
+                X_newLeft = self.X[self.X[:,self.featureSplit]<=self.featureSplitThreshold]
+                y_newLeft = self.y[self.X[:,self.featureSplit]<=self.featureSplitThreshold]
                 X_newRight = self.X[self.X[:,self.featureSplit]>self.featureSplitThreshold]
                 y_newRight = self.y[self.X[:,self.featureSplit]>self.featureSplitThreshold]
 
-            nodeLeft = Node(X=X_newLeft, y=y_newLeft, featureTypes=self.featureTypes, depth=self.depth+1, max_depth=self.maxDepth, samples_to_split=self.samplesToSplit)
+            nodeLeft = Node(X=X_newLeft, y=y_newLeft, featureTypes=self.featureTypes, measure=self.measure, depth=self.depth+1, max_depth=self.maxDepth, samples_to_split=self.samplesToSplit)
             self.left = nodeLeft
             depthTreeLeft = nodeLeft.expand()
 
-            nodeRight = Node(X=X_newRight, y=y_newRight, featureTypes=self.featureTypes, depth=self.depth+1, max_depth=self.maxDepth, samples_to_split=self.samplesToSplit)
+            nodeRight = Node(X=X_newRight, y=y_newRight, featureTypes=self.featureTypes, measure=self.measure, depth=self.depth+1, max_depth=self.maxDepth, samples_to_split=self.samplesToSplit)
             self.right = nodeRight
             depthTreeRight = nodeRight.expand()
 
@@ -234,11 +272,14 @@ if __name__=="__main__":
     print(f"There are {X_train.shape[0]} data for training and {X_test.shape[0]} data for testing")
     print(f"There are {X_train.shape[1]} features in each")
 
-    decisionTree = Node(X_train, y_train)
+    """
+    Perform classification using decision tree
+    """
+    decisionTree = Node(X_train, y_train, measure="Gini")
     decisionTree.expand()
     y_pred = decisionTree.predict(X_test)
     decisionTree.printInfo()
-    
+
     precision = compute_precision(y_test, y_pred)
     recall = compute_recall(y_test, y_pred)
     f1 = compute_f1_score(y_test, y_pred)
