@@ -183,6 +183,10 @@ class Knight(Pieces):
         super().__init__(team, position, name)
 
     def is_tile_valid(self, coordinate_x, coordinate_y):
+        """
+        Returns true if tile delimited by coordinate_x and coordinate_y is on a classic chess board, false otherwise.
+        A classic chess board had 8 tiles on the x and y coordinates.
+        """
         if coordinate_x>=0 and coordinate_x<8 and coordinate_y>=0 and coordinate_y<8:
             return True
         else:
@@ -196,7 +200,17 @@ class Knight(Pieces):
         # Initalize the moves which will be returned. Need to add a dummy move to be able to concatenate later
         moves = np.array([[-1, -1]], dtype=int)
 
-
+        for i in [-2, 2]:
+            for j in [-1, 1]:
+                # If cell is valid and empty or valid and with a piece of ennemy team
+                if self.is_tile_valid(self.position[0]+i, self.position[1]+j) and (board_state[self.position[0]+i, self.position[1]+j].name=="empty" or (board_state[self.position[0]+i, self.position[1]+j].name=="empty" and board_state[self.position[0]+i, self.position[1]+j].team!=self.team)):
+                    moves = np.concatenate((moves, np.array([[self.position[0]+i, self.position[1]+j]])))
+        
+        for i in [-1, 1]:
+            for j in [-2, 2]:
+                # If cell is valid and empty or valid and with a piece of ennemy team
+                if self.is_tile_valid(self.position[0]+i, self.position[1]+j) and (board_state[self.position[0]+i, self.position[1]+j].name=="empty" or (board_state[self.position[0]+i, self.position[1]+j].name=="empty" and board_state[self.position[0]+i, self.position[1]+j].team!=self.team)):
+                    moves = np.concatenate((moves, np.array([[self.position[0]+i, self.position[1]+j]])))
 
         # Remove the dummy move that was added
         moves = np.delete(moves, 0, axis=0)

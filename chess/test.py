@@ -8,8 +8,8 @@ board_state = np.array([
     [pieces.NoPiece(np.array([3, 0])), pieces.NoPiece(np.array([3, 1])), pieces.NoPiece(np.array([3, 2])), pieces.NoPiece(np.array([3, 3])), pieces.NoPiece( np.array([3, 4])), pieces.NoPiece(np.array([3, 5])), pieces.NoPiece(np.array([3, 6])), pieces.NoPiece(np.array([3, 7]))],
     [pieces.NoPiece(np.array([4, 0])), pieces.NoPiece(np.array([4, 1])), pieces.NoPiece(np.array([4, 2])), pieces.NoPiece(np.array([4, 3])), pieces.NoPiece( np.array([4, 4])), pieces.NoPiece(np.array([4, 5])), pieces.NoPiece(np.array([4, 6])), pieces.NoPiece(np.array([4, 7]))],
     [pieces.NoPiece(np.array([5, 0])), pieces.NoPiece(np.array([5, 1])), pieces.NoPiece(np.array([5, 2])), pieces.NoPiece(np.array([5, 3])), pieces.NoPiece( np.array([5, 4])), pieces.NoPiece(np.array([5, 5])), pieces.NoPiece(np.array([5, 6])), pieces.NoPiece(np.array([5, 7]))],
-    [pieces.Pawn("White", np.array([6, 0])), pieces.Pawn("White", np.array([6, 1])), pieces.Pawn("White", np.array([6, 2])), pieces.Pawn("White", np.array([6, 3])), pieces.Pawn("White", np.array([6, 4])), pieces.Pawn("White", np.array([6, 5])), pieces.Pawn("White", np.array([6, 6])), pieces.Pawn("White", np.array([6, 7]))],
-    [pieces.NoPiece(np.array([7, 0])), pieces.NoPiece(np.array([7, 1])), pieces.NoPiece(np.array([7, 2])), pieces.NoPiece(np.array([7, 3])), pieces.NoPiece( np.array([7, 4])), pieces.NoPiece(np.array([7, 5])), pieces.NoPiece(np.array([7, 6])), pieces.NoPiece(np.array([7, 7]))]
+    [pieces.Knight("White", np.array([6, 0])), pieces.Pawn("White", np.array([6, 1])), pieces.Pawn("White", np.array([6, 2])), pieces.Pawn("White", np.array([6, 3])), pieces.Pawn("White", np.array([6, 4])), pieces.Pawn("White", np.array([6, 5])), pieces.Pawn("White", np.array([6, 6])), pieces.Pawn("White", np.array([6, 7]))],
+    [pieces.NoPiece(np.array([7, 0])), pieces.Pawn("White", np.array([7, 1])), pieces.Pawn("White", np.array([7, 2])), pieces.NoPiece(np.array([7, 3])), pieces.NoPiece( np.array([7, 4])), pieces.NoPiece(np.array([7, 5])), pieces.NoPiece(np.array([7, 6])), pieces.NoPiece(np.array([7, 7]))]
     ])
 
 for i in range(0, 8):
