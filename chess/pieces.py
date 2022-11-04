@@ -231,6 +231,38 @@ class Bishop(Pieces):
         # Initalize the moves which will be returned. Need to add a dummy move to be able to concatenate later
         moves = np.array([[-1, -1]], dtype=int)
 
+        # Check moves on the upper left side diagonaly
+        for i in range(1, min(self.position[0]-1, self.position[1]-1)):
+            # If tile is empty
+            if board_state[self.position[0]-i, self.position[1]-i]:
+                # Add empty tile and continue loop
+                moves = np.concatenate((moves, np.array([[self.position[0]-i, self.position[1]-i]])))
+            # If tile is occupied by ennemy piece
+            elif board_state[self.position[0]-i, self.position[1]-i].teamn!=self.team:
+                # Add ennemy occupied tile and stop loop as bishop cannot jump pieces
+                moves = np.concatenate((moves, np.array([[self.position[0]-i, self.position[1]-i]])))
+                break
+            # If tile is occupied by allied piece
+            else:
+                # Stop loop as bishop cannot get on same piece as allied piece and cannot jump pieces
+                break
+
+        # Check moves on the upper left side diagonaly
+        for i in range(1, min(self.position[0]-1, self.position[1]-1)):
+            # If tile is empty
+            if board_state[self.position[0]-i, self.position[1]-i]:
+                # Add empty tile and continue loop
+                moves = np.concatenate((moves, np.array([[self.position[0]-i, self.position[1]-i]])))
+            # If tile is occupied by ennemy piece
+            elif board_state[self.position[0]-i, self.position[1]-i].teamn!=self.team:
+                # Add ennemy occupied tile and stop loop as bishop cannot jump pieces
+                moves = np.concatenate((moves, np.array([[self.position[0]-i, self.position[1]-i]])))
+                break
+            # If tile is occupied by allied piece
+            else:
+                # Stop loop as bishop cannot get on same piece as allied piece and cannot jump pieces
+                break        
+        
         # Remove the dummy move that was added
         moves = np.delete(moves, 0, axis=0)
         return moves
@@ -268,6 +300,12 @@ class King(Pieces):
         """
         # Initalize the moves which will be returned. Need to add a dummy move to be able to concatenate later
         moves = np.array([[-1, -1]], dtype=int)
+
+        for i in [-1, 0, 1]:
+            for j in [-1, 0, 1]:
+                if i!=0 and j!=0:
+                    if board_state[self.position[0]+i, self.position[1]+j].name!="empty" and board_state[self.position[0]+i, self.position[1]+j].team!=self.team:
+                        moves = np.concatenate((moves, np.array([[self.position[0]+i, self.position[1]+j]])))
 
         # Remove the dummy move that was added
         moves = np.delete(moves, 0, axis=0)
