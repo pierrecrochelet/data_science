@@ -7,7 +7,7 @@ import pieces
 class ChessRules():
 
     @staticmethod
-    def is_legal_move(cstate, action, player):
+    def is_legal_move(state, action, player):
         """
         
         """

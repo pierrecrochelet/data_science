@@ -74,7 +74,7 @@ class Board:
         Finds all the empty cells on the board
 
         Returns:
-             np.array: containing the coordinates of all the empty cells
+             np.array: array of the coordinates of all the empty cells
         """
         # Initalize the array which will be returned. Need to add a dummy cell to be able to concatenate later
         empty_cells = np.array([[-1, -1]], dtype=int)
@@ -85,3 +85,43 @@ class Board:
 
         # Remove the dummy cell that was added
         empty_cells = np.delete(empty_cells, 0, axis=0)
+        return empty_cells
+
+    def get_player_pieces_on_board(self, team):
+        """
+        Get all pieces of a player
+
+        Args:
+            team: str, the player's team. either 'White' or 'Black'
+
+        Returns:
+            np.array: array of the coordinates of all the player's pieces
+        """
+
+        if team!="White" and team!="Black":
+            raise ValueError
+
+        # Initalize the array which will be returned. Need to add a dummy cell to be able to concatenate later
+        player_pieces = np.array([[-1, -1]], dtype=int)
+        for i in range(0, self.board_state.shape[0]):
+            for j in range(0, self.board_state.shape[1]):
+                if self.board_state[i,j].team==team:
+                    player_pieces = np.concatenate((player_pieces, np.array([[i,j]])))
+
+        # Remove the dummy cell that was added
+        player_pieces = np.delete(player_pieces, 0, axis=0)
+        return player_pieces
+
+    def fill_cell(self, x_coordinate, y_coordinate, piece):
+        """
+        Fill the cell with the specified piece
+
+        Args:
+            x_coordinate: int, the coordinate along the x axis of the cell
+            y_coordinate: int, the coordinate along the y axis of the cell
+            piece: Object of type Pieces except NoPiece, the piece to fill the cell with
+        """
+
+        # If cell is empty or has a piece of the other team
+        if piece.team != self.board[x_coordinate, y_coordinate].team:
+            self._board_state[x_coordinate, y_coordinate] = piece
