@@ -15,7 +15,11 @@ class Pieces():
         Returns all moves (possible or not). 
         The board class will filter the correct moves.
         """
-        pass
+        # Return the empty array as NoPieces cannot move
+        return np.array([[]])
+    
+    def __eq__(self, other):
+        return self.team==other.team and self.name==other.name and self.position==other.position
 
 """
 No Piece (represents most of the board)
@@ -182,7 +186,7 @@ class Rook(Pieces):
 Knight Piece. Has those wierd moves
 """
 class Knight(Pieces):
-    def __init__(self, team, position, name="Knight") -> None:
+    def __init__(self, team, position, name="knight") -> None:
         super().__init__(team, position, name)
 
     def is_tile_valid(self, coordinate_x, coordinate_y):
@@ -223,7 +227,7 @@ class Knight(Pieces):
 Bishop Bishop. Can move in diagonal
 """
 class Bishop(Pieces):
-    def __init__(self, team, position, name="Bishop") -> None:
+    def __init__(self, team, position, name="bishop") -> None:
         super().__init__(team, position, name)
 
     def move(self, board_state) -> np.array:
@@ -306,7 +310,7 @@ class Bishop(Pieces):
 Queen Piece. Can move in any direction unlimited
 """
 class Queen(Pieces):
-    def __init__(self, team, position, name="Queen") -> None:
+    def __init__(self, team, position, name="queen") -> None:
         super().__init__(team, position, name)
 
     def move(self, board_state) -> np.array:
@@ -455,7 +459,7 @@ class Queen(Pieces):
 King Piece. Can move in any direction by 1
 """
 class King(Pieces):
-    def __init__(self, team, position, name="King") -> None:
+    def __init__(self, team, position, name="king") -> None:
         super().__init__(team, position, name)
 
     def is_tile_valid(self, coordinate_x, coordinate_y):
