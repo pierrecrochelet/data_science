@@ -94,6 +94,8 @@ class ChessRules():
         
         if board.board_state[to_x, to_y].name!="empty" and board.board_state[to_x, to_y].team!=team:
             captured_piece = board.board_state[to_x, to_y]
+        else:
+            captured_piece = None
         state.captured = captured_piece
         if board.board_state[from_x, from_y].name=="pawn":
             board.fill_cell(to_x, to_y, pieces.Pawn(team=team, position=np.array([to_x, to_y])))
@@ -124,7 +126,7 @@ class ChessRules():
             pass 
 
         state.set_board(board)
-        state.score[player] += reward
+        state.score[player.team] += reward
         state.set_latest_player(player)
         state.set_latest_move(action)
         done = ChessRules.is_end_game(state)
@@ -161,10 +163,28 @@ class ChessRules():
             np.array: containing all the actions available for that player
         """
         board = state.get_board()
+        next_player = state.get_next_player()
         actions = []
         all_pieces_positions = board.get_player_pieces_on_board(player.team)
         for piece_position in all_pieces_positions:
-            moves = board[piece_position].move(board.board_state)
+
+            # If the piece is the king, check that it doesn't go somewhere attacked by other player
+            if board[piece_position].name=="king":
+                moves = board[piece_position].move(board.board_state)
+                other_player_pieces_positions = board.get_player_pieces_on_board(next_player.team)
+
+                # Initalize the moves which will be returned. Need to add a dummy move to be able to concatenate later
+                opponent_moves = np.array([[-1, -1]], dtype=int)
+                for opponent_piece_position in other_player_pieces_positions:
+                    opponent_moves = np.concatenate((opponent_moves, board.board_state[opponent_piece_position].move(board.board_state)))
+                for i in range(moves):
+                    to_delete = []
+                    if moves[i] in opponent_moves:
+                        to_delete.append(i)
+                moves = np.delete(moves, to_delete, axis=1)
+
+            else:
+                moves = board.board_state[piece_position].move(board.board_state)
             for move in moves:
                 actions.append(ChessAction(piece_position, move))
         return np.array(actions)
@@ -223,4 +243,6 @@ class ChessRules():
         board = state.get_board()
         last_player = state.get_last_player()
         next_player = state.get_next_player()
-        
+
+
+
