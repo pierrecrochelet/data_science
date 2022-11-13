@@ -12,9 +12,9 @@ class ChessRules():
         Check if the action performed by the player is legal in the current state
 
         Args:
-            state: object of ChessState, 
+            state: object of ChessState, defines the state of the game
             action: object of ChessAction, defines the action with the from_cell and to_cell
-            player: 
+            player: object of ChessPlayer, defines the player who moves next
 
         Returns:
             bool: True if the action is legal. False if not.
@@ -22,8 +22,15 @@ class ChessRules():
 
         action = action.get_action_as_dict()
 
-        if state.get_next_player == player:
+        if state.get_next_player() == player:
             if state.get_board().get_cell_team(action["from_cell"][0], action["from_cell"][1])==player.team:
+                # If king is attacked and player is trying to move another piece
+                # TO DO: player can move other piece if it intercepts the attack
+                if ChessRules.is_king_attacked(state) and state.get_board().board_state[action["from_cell"]].name!="king":
+                    return False
+                # If king is moving towards attack
+                if state.get_board().board_state[action["from_cell"]].name=="king" and ChessRules.is_cell_attacked(state, action["to_cell"][0], action["to_cell"][1], state.get_latest_player()):
+                    return False
                 effective_moves = ChessRules.get_effective_cell_moves(state, action["from_cell"][0], action["from_cell"][1])
                 if effective_moves and action["to_cell"] in effective_moves:
                     return True
@@ -37,7 +44,7 @@ class ChessRules():
         Returns all the moves doable by the piece on the cell
 
         Args:
-            state: object of ChessState
+            state: object of ChessState, defines the state of the game
             x_coordinate: int, the coordinate along the x axis of the cell
             y_coordinate: int, the coordinate along the y axis of the cell
 
@@ -49,14 +56,67 @@ class ChessRules():
         return moves
 
     @staticmethod
+    def is_king_attacked(state):
+        """
+        Check if in the current state, the king is attacker.
+
+        Args:
+            state: object of ChessState, defines the state of the game
+
+        Returns:
+            bool: True if the king is attacker. False if not.
+        """
+        board = state.get_board()
+        next_player = state.get_next_player()
+
+        # Get king coordinates
+        for i in range(0, board.board_state.shape[0]):
+            for j in range(0, board.board_state.shape[1]):
+                if board.board_state[i,j].name=="king" and board.board_state[i,j].team==next_player.team:
+                    king_position = np.array([i,j])
+                    break
+        # Get all other player actions
+        other_player_actions = ChessRules.get_player_all_cases_actions(state, state.get_latest_player())
+        for i in range(0, other_player_actions.shape[0]):
+            action = other_player_actions[i].get_action_as_dict()
+            # If one piece of other player can attack king
+            if king_position==action["to_cell"]:
+                return True
+        # If no piece of other player can attack king
+        return False
+
+    @staticmethod
+    def is_cell_attacked(state, x_coordinate, y_coordinate, player):
+        """
+        Checks if the cell can be attacked by the player
+
+        Args:
+            state: object of ChessState, defines the state of the game
+            x_coordinate: int, the coordinate along the x axis of the cell
+            y_coordinate: int, the coordinate along the y axis of the cell
+            player: object of ChessPlayer, defines the player who attacks the cell
+
+        Returns:
+            moves: np.array containing all the moves the piece at the specified coordinates can do
+        """
+        # Get all actions of the player
+        player_actions = ChessRules.get_player_all_cases_actions(state, player)
+        for i in range(0, player_actions.shape[0]):
+            action = player_actions[i].get_action_as_dict()
+            # If coordinate can be attacked
+            if np.array([x_coordinate, y_coordinate])==action["to_cell"]:
+                return True
+        return False
+
+    @staticmethod
     def act(state, action, player):
         """
         If the move is legal, call the make move function
 
         Args: 
-            state: object of ChessState, 
+            state: object of ChessState, defines the state of the game
             action: object of ChessAction, defines the action with the from_cell and to_cell
-            player: 
+            player: object of ChessPlayer, defines the player who moves next
 
         Returns:
             bool: False if the move is not legal. a call to make_move otherwise.
@@ -163,28 +223,10 @@ class ChessRules():
             np.array: containing all the actions available for that player
         """
         board = state.get_board()
-        next_player = state.get_next_player()
         actions = []
         all_pieces_positions = board.get_player_pieces_on_board(player.team)
         for piece_position in all_pieces_positions:
-
-            # If the piece is the king, check that it doesn't go somewhere attacked by other player
-            if board[piece_position].name=="king":
-                moves = board[piece_position].move(board.board_state)
-                other_player_pieces_positions = board.get_player_pieces_on_board(next_player.team)
-
-                # Initalize the moves which will be returned. Need to add a dummy move to be able to concatenate later
-                opponent_moves = np.array([[-1, -1]], dtype=int)
-                for opponent_piece_position in other_player_pieces_positions:
-                    opponent_moves = np.concatenate((opponent_moves, board.board_state[opponent_piece_position].move(board.board_state)))
-                for i in range(moves):
-                    to_delete = []
-                    if moves[i] in opponent_moves:
-                        to_delete.append(i)
-                moves = np.delete(moves, to_delete, axis=1)
-
-            else:
-                moves = board.board_state[piece_position].move(board.board_state)
+            moves = board.board_state[piece_position].move(board.board_state)
             for move in moves:
                 actions.append(ChessAction(piece_position, move))
         return np.array(actions)
@@ -197,14 +239,13 @@ class ChessRules():
         Args:
             state: object of ChessState, 
 
-
         Returns:
             bool: True if the given state is the final. False if not.
 
         """
-        if ChessRules.is_stalemate(state):
+        if ChessRules.is_checkmate(state):
             return True
-        if ChessRules.checkmate(state):
+        if ChessRules.is_stalemate(state):
             return True
         # TO DO: Add the threefold rule implementation, returning True if the current state has already been seen 2 times (and is therefore the third)
         return False
@@ -212,27 +253,39 @@ class ChessRules():
     @staticmethod
     def is_stalemate(state):
         """
-        Check if the given state is the last one for the current game.
+        Check if the given state is stalemate.
 
         Args:
             state: object of ChessState, 
-
 
         Returns:
             bool: True if the given state is stalemate. False if not.
 
         """
+        board = state.get_board()
         next_player = state.get_next_player()
-
+        latest_player = state.get_latest_player()
         actions = ChessRules.get_player_all_cases_actions(state, next_player)
-        if len(actions)==0:
+        # No actions i.e. king is trapped behind other pieces
+        if actions.shape[0]==0:
             return True
-        return False
+        for i in range(0, actions.shape[0]):
+            action = actions[i].get_action_as_dict()
+            # If player can move any other piece than king. They have to move it and it is not stalemate
+            if board.board_state[action["from_cell"]].name!="king":
+                return False
+            # If player can only move king. Check if king is allowed to move
+            else:
+                # If king is allowed to move then no stalemate
+                if not ChessRules.is_cell_attacked(state, action["to_cell"][0], action["to_cell"][1], latest_player):
+                    return False
+        # If none of the possible actions is allowed then stalemate
+        return True
     
     @staticmethod
-    def checkmate(state):
+    def is_checkmate(state):
         """
-        Check if the given state is the last one for the current game.
+        Check if the given state is checkmate.
 
         Args:
             state: object of ChessState, 
@@ -241,8 +294,40 @@ class ChessRules():
             bool: True if the given state is checkmate. False if not.
         """
         board = state.get_board()
-        last_player = state.get_last_player()
+        latest_player = state.get_latest_player()
         next_player = state.get_next_player()
+        
+        # Get opponent actions
+        opponent_actions = ChessRules.get_player_all_cases_actions(state, latest_player)
+
+        # get king position
+        for i in range(0, board.board_state.shape[0]):
+            for j in range(0, board.board_state.shape[1]):
+                if board.board_state[i,j].name=="king" and board.board_state[i,j].team==next_player.team:
+                    king_position = np.array([i,j])
+                    king_moves = board.board_state[i,j].move(board.board_state)
+                    break
+        # Initialize number of free tiles as the king position + each chell where the king can move
+        free_tiles = king_moves.shape[0]+1
+        # Decrement free_tiles for each cell where the king could move but is attacked
+        for move in king_moves:
+            for k in range(0, opponent_actions.shape[0]):
+                action = opponent_actions[k].get_action_as_dict()
+                if action["to_cell"]==move:
+                    free_tiles -=1
+                    break
+        # Decrement free_tile if the king position is attacked
+        for k in range(0, opponent_actions.shape[0]):
+            action = opponent_actions[k].get_action_as_dict()
+            if action["to_cell"]==king_position:
+                free_tiles -=1
+                break
+        # If king has no tile to move and is attacked and the attack is not blockable then it's checkmate
+        # TO DO: add the check if the attack is blockable
+        if free_tiles==0:
+            return True
+        return False
+
 
 
 
