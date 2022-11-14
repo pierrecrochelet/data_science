@@ -258,7 +258,7 @@ class ChessRules():
 
         Args:
             state: object of ChessState, defines the state of the game
-            action: object of ChessAction, defines the action with the from_cell and to_cell
+            player: object of ChessPlayer, defines the player who moves next
 
         Returns:
             ChessAction: a legal action

@@ -1,4 +1,4 @@
-class ChessPlayer():
+class ChessPlayer(object):
 
     def __init__(self, team, score=0) -> None:
         self.team = team
