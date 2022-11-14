@@ -6,11 +6,12 @@ class ChessState(object):
     def __init__(self, board, next_player=ChessPlayer(team="White"), latest_player=ChessPlayer(team="Black")) -> None:
         """The State of the Chess Game. It contains information regarding the game such as:
             - board          : The current board
-            - score          : The game score
+            - score          : The game score calculated from the pieces captured
             - latest_move    : The latest performed action
             - latest_player  : The latest player
             - next_player    : The next player
-            - captured       : The captured piece in the last move, can be None.
+            - captured       : The captured piece in the last move, can be None
+            - wiiner         : The winner of the game at the end
         Args:
             board (Board): The board game
             next_player (str, optional): The next or first player at the start. Defaults to White.
@@ -22,6 +23,7 @@ class ChessState(object):
         self.next_player = next_player
         self.latest_move = None
         self.captured = None
+        self.winner = None
         self.score = {"White": 0, "Black": 0}
 
     def get_board(self):

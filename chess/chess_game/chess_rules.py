@@ -191,9 +191,9 @@ class ChessRules():
         make the move and update the state
 
         Args:
-            state: object of ChessState, 
+            state: object of ChessState, defines the state of the game
             action: object of ChessAction, defines the action with the from_cell and to_cell
-            player: 
+            player: object of ChessPlayer, defines the player who moves next
 
         Return:
             ChessState: The new state of the game
@@ -257,7 +257,7 @@ class ChessRules():
         Choose a random move for the player to play
 
         Args:
-            state: object of ChessState, 
+            state: object of ChessState, defines the state of the game
             action: object of ChessAction, defines the action with the from_cell and to_cell
 
         Returns:
@@ -279,7 +279,7 @@ class ChessRules():
         Finds all possible actions for the player
 
         Args:
-            state: object of ChessState, 
+            state: object of ChessState, defines the state of the game
             action: object of ChessAction, defines the action with the from_cell and to_cell
 
         Returns:
@@ -300,7 +300,7 @@ class ChessRules():
         Check if the given state is the last one for the current game.
 
         Args:
-            state: object of ChessState, 
+            state: object of ChessState, defines the state of the game
 
         Returns:
             bool: True if the given state is the final. False if not.
@@ -309,6 +309,7 @@ class ChessRules():
         if ChessRules.is_checkmate(state):
             return True
         if ChessRules.is_stalemate(state):
+            state.winner = state.get_latest_player().team
             return True
         # TO DO: Add the threefold rule implementation, returning True if the current state has already been seen 2 times (and is therefore the third)
         return False
@@ -319,7 +320,7 @@ class ChessRules():
         Check if the given state is stalemate.
 
         Args:
-            state: object of ChessState, 
+            state: object of ChessState, defines the state of the game
 
         Returns:
             bool: True if the given state is stalemate. False if not.
@@ -351,7 +352,7 @@ class ChessRules():
         Check if the given state is checkmate.
 
         Args:
-            state: object of ChessState, 
+            state: object of ChessState, defines the state of the game
 
         Returns:
             bool: True if the given state is checkmate. False if not.
@@ -432,7 +433,18 @@ class ChessRules():
             return True
 
 
+    @staticmethod
+    def get_results(state):
+        """
+        Provide the results at the end of the game.
 
-
-
-
+        Args:
+            state: object of ChessState, defines the state of the game
+        Returns:
+            Dictionary: Containing the winner and the game score.
+        """
+        tie = False
+        if state.winner != None:
+            tie = True
+        return {'tie': tie, 'winner': "tie" if tie else state.winner,
+                'score': state.score}
