@@ -24,15 +24,21 @@ class ChessRules():
 
         if state.get_next_player() == player:
             if state.get_board().get_cell_team(action["from_cell"][0], action["from_cell"][1])==player.team:
-                # If king is attacked and player is trying to move another piece
-                # TO DO: player can move other piece if it intercepts the attack
-                if ChessRules.is_king_attacked(state) and state.get_board().board_state[action["from_cell"]].name!="king":
-                    return False
+                # If king is attacked, player either has to move king or block the attack
+                if ChessRules.is_king_attacked(state):
+                    blockable, blockable_tiles = ChessRules.is_attack_blockable(state)
+                    # If attack is not blockable, and player is not moving king, move is not legal
+                    if not blockable and state.get_board().board_state[action["from_cell"]].name!="king":
+                        return False
+                    # If action is blockable but player does not try to block it nor move the king, move is not legal
+                    else:
+                        if blockable and not any(np.array_equal(x, action["to_cell"]) for x in blockable_tiles) and state.get_board().board_state[action["from_cell"]].name!="king":
+                            return False
                 # If king is moving towards attack
                 if state.get_board().board_state[action["from_cell"]].name=="king" and ChessRules.is_cell_attacked(state, action["to_cell"][0], action["to_cell"][1], state.get_latest_player()):
                     return False
                 effective_moves = ChessRules.get_effective_cell_moves(state, action["from_cell"][0], action["from_cell"][1])
-                if effective_moves and action["to_cell"] in effective_moves:
+                if effective_moves and any(np.array_equal(x, action["to_cell"]) for x in effective_moves):
                     return True
                 return False
             return False
@@ -49,11 +55,63 @@ class ChessRules():
             y_coordinate: int, the coordinate along the y axis of the cell
 
         Returns:
-            moves: np.array containing all the moves the piece at the specified coordinates can do
+            np.array: containing all the moves the piece at the specified coordinates can do
         """
         board = state.get_board()
         moves = board[x_coordinate, y_coordinate].move(board.board_state)
         return moves
+
+    @staticmethod
+    def is_attack_blockable(state):
+        """
+        Check if the attack on the king is blockable.
+
+        Args:
+            state: object of ChessState, defines the state of the game
+
+        Returns:
+            bool: Whether the attack is blockable or not
+            np.array: all the tiles which can be used to block the attack, including the origin of the attack
+        """
+        board = state.get_board()
+        next_player = state.get_next_player()
+        latest_player = state.get_latest_player()
+
+        # Get king coordinates
+        for i in range(0, board.board_state.shape[0]):
+            for j in range(0, board.board_state.shape[1]):
+                if board.board_state[i,j].name=="king" and board.board_state[i,j].team==next_player.team:
+                    king_position = np.array([i,j])
+                    break
+        
+        # Find attacking piece(s)
+        found = 0
+        opponent_actions = ChessRules.get_player_all_cases_actions(state, latest_player)
+        for i in range(0, opponent_actions):
+            action = opponent_actions[i].get_action_as_dict()
+            if np.array_equal(action["to_cell"], king_position):
+                # If ennemy is attacking from multiple pieces at once then attack is not blockable
+                if found > 0:
+                    return False, None
+                else:
+                    found += 1
+                    attack_origin = action["from_cell"]
+        
+        # If the attack is from a pawn or a knight, the only way to intercept it is to take that piece
+        if board.board_state[attack_origin].name=="pawn" or board.board_state[attack_origin].name=="knight":
+            return True, attack_origin
+        # Else you can either take the piece or get in the path 
+        else:
+            # Initalize the moves which will be returned. Need to add a dummy move to be able to concatenate later
+            blockable_tiles = np.array([[-1, -1]], dtype=int)
+            i = attack_origin[0]
+            j = attack_origin[1]
+            while(i!=king_position[0] and j!=king_position[1]):
+                blockable_tiles = np.concatenate((blockable_tiles, np.array([[i,j]])))
+                i += np.sign(king_position[0]-i)
+                j += np.sign(king_position[1]-j)
+            blockable_tiles = np.delete(blockable_tiles, 0, axis=0)
+            return True, blockable_tiles
 
     @staticmethod
     def is_king_attacked(state):
@@ -80,7 +138,7 @@ class ChessRules():
         for i in range(0, other_player_actions.shape[0]):
             action = other_player_actions[i].get_action_as_dict()
             # If one piece of other player can attack king
-            if king_position==action["to_cell"]:
+            if np.array_equal(king_position, action["to_cell"]):
                 return True
         # If no piece of other player can attack king
         return False
@@ -104,7 +162,7 @@ class ChessRules():
         for i in range(0, player_actions.shape[0]):
             action = player_actions[i].get_action_as_dict()
             # If coordinate can be attacked
-            if np.array([x_coordinate, y_coordinate])==action["to_cell"]:
+            if np.array_equal(np.array([x_coordinate, y_coordinate]), action["to_cell"]):
                 return True
         return False
 
@@ -187,6 +245,7 @@ class ChessRules():
 
         state.set_board(board)
         state.score[player.team] += reward
+        state.set_next_player(state.get_latest_player())
         state.set_latest_player(player)
         state.set_latest_move(action)
         done = ChessRules.is_end_game(state)
@@ -202,13 +261,17 @@ class ChessRules():
             action: object of ChessAction, defines the action with the from_cell and to_cell
 
         Returns:
-            ChessAction: an action
+            ChessAction: a legal action
         """
         import random
         print(f"Player, {player}")
         actions = ChessRules.get_player_all_cases_actions(state, player)
-        choose = random.choice(actions)
-        return choose
+        subset_legal_actions = []
+        for i in range(0, actions.shape[0]):
+            if ChessRules.is_legal_move(state, actions[i], player):
+                subset_legal_actions.append(i)
+        choose = random.choice(subset_legal_actions)
+        return actions[choose]
 
     @staticmethod
     def get_player_all_cases_actions(state, player):
@@ -297,8 +360,9 @@ class ChessRules():
         latest_player = state.get_latest_player()
         next_player = state.get_next_player()
         
-        # Get opponent actions
+        # Get opponent actions and player actions
         opponent_actions = ChessRules.get_player_all_cases_actions(state, latest_player)
+        player_actions = ChessRules.get_player_all_cases_actions(state, next_player)
 
         # get king position
         for i in range(0, board.board_state.shape[0]):
@@ -313,20 +377,61 @@ class ChessRules():
         for move in king_moves:
             for k in range(0, opponent_actions.shape[0]):
                 action = opponent_actions[k].get_action_as_dict()
-                if action["to_cell"]==move:
+                if np.array_equal(action["to_cell"], move):
                     free_tiles -=1
                     break
         # Decrement free_tile if the king position is attacked
         for k in range(0, opponent_actions.shape[0]):
             action = opponent_actions[k].get_action_as_dict()
-            if action["to_cell"]==king_position:
+            if np.array_equal(action["to_cell"], king_position):
                 free_tiles -=1
                 break
-        # If king has no tile to move and is attacked and the attack is not blockable then it's checkmate
-        # TO DO: add the check if the attack is blockable
-        if free_tiles==0:
+        # King has at least one position to move so it is not checkmate
+        if free_tiles>0:
+            return False
+        # King has no more positions to move and cannot stay in place, check to block the attack otherwise its checkmate
+        # Find attacking piece(s)
+        found = 0
+        for i in range(0, opponent_actions):
+            action = opponent_actions[i].get_action_as_dict()
+            if np.array_equal(action["to_cell"], king_position):
+                # If ennemy is attacking from multiple pieces at once then attack is not blockable and it is checkmate
+                if found > 0:
+                    return True
+                else:
+                    found += 1
+                    attack_origin = action["from_cell"]
+        
+        # If the attack is from a pawn or a knight, the only way to intercept it is to take that piece
+        if board.board_state[attack_origin].name=="pawn" or board.board_state[attack_origin].name=="knight":
+            for player_action_counter in range(0, player_actions.shape[0]):
+                player_action = player_actions[player_action_counter].get_action_as_dict()
+                # Player can take the pawn or knight so it is not checkmate yet
+                if np.array_equal(player_action["to_cell"], attack_origin):
+                    return False
+            # None of the player pieces can take the pawn or knight so it is checkmate
             return True
-        return False
+        # Else you can either take the piece or get in the path 
+        else:
+            # Initalize the moves which will be returned. Need to add a dummy move to be able to concatenate later
+            blockable_tiles = np.array([[-1, -1]], dtype=int)
+            i = attack_origin[0]
+            j = attack_origin[1]
+            while(i!=king_position[0] and j!=king_position[1]):
+                blockable_tiles = np.concatenate((blockable_tiles, np.array([[i,j]])))
+                i += np.sign(king_position[0]-i)
+                j += np.sign(king_position[1]-j)
+            blockable_tiles = np.delete(blockable_tiles, 0, axis=0)
+
+            for player_action_counter in range(0, player_actions.shape[0]):
+                player_action = player_actions[player_action_counter].get_action_as_dict()
+                # Player can intercept the path of the attack so it is not checkmate
+                if any(np.array_equal(player_action["to_cell"], x) for x in blockable_tiles):
+                    return False
+            # None of the player's pieces can intercept the attack 
+            return True
+
+
 
 
 
