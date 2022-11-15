@@ -112,8 +112,8 @@ class Panel(QWidget):
     def reset_panel_player(self):
         empty = QtGui.QPixmap(0, 0)
         arrow = QtGui.QPixmap('assets/arrow.png')
-        self.arrowWhite.setPixmap(empty)
-        self.arrowBlack.setPixmap(arrow)
+        self.arrowWhite.setPixmap(arrow)
+        self.arrowBlack.setPixmap(empty)
 
     def update_score(self, score, in_hands):
         self.score1.setText(str(score[-1]) + "[" + str(in_hands[-1]) + "]")
