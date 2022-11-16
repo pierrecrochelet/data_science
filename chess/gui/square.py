@@ -18,7 +18,10 @@ class Square(QLabel, QWidget, QtCore.QObject):
         self.piece = None
         self.active = False
         self.setStatusTip(self.toNotation())
-        self.backgroundColor = "white"
+        if (col+row)%2==0:
+            self.backgroundColor = "#e1cebc"
+        else:
+            self.backgroundColor = "#964f0b"
     
     def enable(self, active):
         self.active = active
@@ -43,7 +46,7 @@ class Square(QLabel, QWidget, QtCore.QObject):
     def set_piece(self, piece):
         self.piece = piece
         self.setPixmap(piece.getImage())
-        self.setStatusTip(self.toNotation() + " - " + self.piece.color)
+        self.setStatusTip(self.toNotation() + " - " + self.piece.team)
 
     def remove_piece(self):
         self.piece = None
@@ -54,9 +57,9 @@ class Square(QLabel, QWidget, QtCore.QObject):
     def __set_color(self, color):
 
         if color == 0:
-            self.setStyleSheet("""QLabel { background-color : white; } """)
+            self.setStyleSheet("""QLabel { background-color : #e1cebc; } """)
         elif color == 1:
-            self.setStyleSheet("""QLabel { background-color : grey; } """)
+            self.setStyleSheet("""QLabel { background-color : #964f0b; } """)
         else:
             raise Exception("Incorrect chess square color")
         self.color = color

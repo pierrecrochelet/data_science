@@ -307,9 +307,9 @@ class ChessRules():
 
         """
         if ChessRules.is_checkmate(state):
+            state.winner = state.get_latest_player().team
             return True
         if ChessRules.is_stalemate(state):
-            state.winner = state.get_latest_player().team
             return True
         # TO DO: Add the threefold rule implementation, returning True if the current state has already been seen 2 times (and is therefore the third)
         return False
@@ -444,7 +444,7 @@ class ChessRules():
             Dictionary: Containing the winner and the game score.
         """
         tie = False
-        if state.winner != None:
+        if state.winner == None:
             tie = True
         return {'tie': tie, 'winner': "tie" if tie else state.winner,
                 'score': state.score}
