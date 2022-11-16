@@ -241,7 +241,7 @@ class ChessRules():
                 reward += 9
         else:
             # TO DO: add the threefold rule implementation saving each board state
-            pass 
+            reward += 0
 
         state.set_board(board)
         state.score[player.team] += reward

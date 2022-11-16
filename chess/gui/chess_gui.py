@@ -50,10 +50,10 @@ class ChessGUI(QMainWindow):
     def reset(self) -> None:
         self.done = False
         self.rewarding_move = False
-        self.board = BoardGUI(self.board_type)
+        self.board_gui = BoardGUI(self.board_type)
         next_player = self.players["White"]
         latest_player = self.players["Black"]
-        self.state = ChessState(board=self.board.get_board(), next_player=next_player, latest_player = latest_player)
+        self.state = ChessState(board=self.board_gui.get_board(), next_player=next_player, latest_player = latest_player)
         self.trace = Trace(state=self.state, players={"White": self.players["White"].name,  "Black": self.players["Black"].name})
         self.current_player = next_player
 
@@ -127,22 +127,22 @@ class ChessGUI(QMainWindow):
             pass
 
     def reset_for_new_game(self) -> None:
-        self.board.reset_board()
-        self.board.score = {"White": 0, "Black": 0}
+        self.board_gui.reset_board()
+        self.board_gui.score = {"White": 0, "Black": 0}
         self.done = False
 
-        self.board.enable_all_squares()
+        self.board_gui.enable_all_squares()
         self.panel.reset_panel_player()
-        self.board.current_player = self.first_player
+        self.board_gui.current_player = self.first_player
         self.current_player = self.players[self.first_player]
         self.panel.update_current_player(self.current_player.team)
 
         self.state = ChessState(
-            board=self.board.get_board(), 
+            board=self.board_gui.get_board(), 
             next_player=self.players[self.first_player], 
             latest_player = self.players["White"] if "White"==self.first_player else self.players["Black"]
         )
-        self.board.set_default_colors()
+        self.board_gui.set_default_colors()
 
         for team in ["White", "Black"]:
             self.players[team].reset_player_informations()
@@ -168,10 +168,73 @@ class ChessGUI(QMainWindow):
 
     def play_game(self):
         print("Game to be played")
+        hit = 0
+        timer_first_player = Timer("first_player", total_time=self.allowed_time, logger=None)
+        timer_second_player = Timer("second_player", total_time=self.allowed_time, logger=None)
+        turn = self.first_player
+
+        while not self.done:
+            hit += 1
+            time.sleep(self.sleep_time)
+            state = deepcopy(self.state)
+            remain_time = timer_first_player.remain_time() if turn == -1 else timer_second_player.remain_time()
+            remain_time_copy = deepcopy(remain_time)
+            if remain_time>0:
+                timer_first_player.start() if turn == "White" else timer_second_player.start()
+                action = self.players[turn].play(state, remain_time_copy)
+                elapsed_time = timer_first_player.stop() if turn == "White" else timer_second_player.stop()
+                remain_time = timer_first_player.remain_time() if turn == "Black" else timer_second_player.remain_time()
+                if self.step(action):
+                    print('Action performed successfully by', turn, ' in', str(elapsed_time), ' rest ', remain_time)
+                else:
+                    print("An illegal move were given. Performing a random move")
+                    print(f"Launching a random move for {turn}")
+                    action = ChessRules.random_play(state, turn)
+                    self.step(action)
+
+            else:
+                print("No remain time for ", turn, " Performing a random move")
+                print(f"Lunching a random move for {turn}")
+                action = ChessRules.random_play(state, turn) 
+                self.step(action)
+            self.update_gui()
+            self.trace.add(self.state)
+            #self.players[turn].update_player_infos(self.get_player_info(turn))
+            turn = self.state.get_next_player()
+
+        self.update_gui()
+        self.results()
+        self.save_game_trigger()
+        self.board_gui.set_default_colors()
+        print("\nIt's over.")
 
 
-    def update_gui():
-        pass
+    def update_gui(self):
+        action = self.state.get_latest_move()
+        self.app.processEvents()
+        to = action['to_cell']
+        at = action['from_cell']
+        self.board_gui.squares[at[0]][at[1]].set_background_color("blue")
+        self.app.processEvents()
+        time.sleep(self.sleep_time / 2)
+        self.board_gui.set_default_colors()
+        self.board_gui.squares[to[0]][to[1]].set_background_color("green")
+        self.app.processEvents()
+        time.sleep(self.sleep_time / 2)
+        self.board_gui.move_piece(at, to, self.state.get_latest_player().team, self.board_gui.get_board().get_board_state()["from_cell"].name)
+        self.board_gui.set_default_colors()
+        time.sleep(self.sleep_time / 2)
+        # Not sure those lines are needed
+        #if self.state.captured is not None:
+        #    piece_position = self.state.captured.position
+        #    self.board_gui.squares[piece_position[0]][piece_position[1]].set_background_color("red")
+        #    self.app.processEvents()
+        #    self.board_gui.remove_piece(piece_position)
+        #time.sleep(self.sleep_time / 2)
+        #self.app.processEvents()
+        self.panel.update_score(self.state.score, self.state.score)
+        self.board_gui.set_default_colors()
+        self.panel.update_current_player(self.state.get_next_player().team)
 
     def get_player_info(self, player):
         return self.state.get_player_info(player)
@@ -189,10 +252,9 @@ class ChessGUI(QMainWindow):
                 end = QMessageBox.information(self, "End", "No winners.")
 
     def load_battle(self, states, delay=0.5, done=True):
-        self.board.set_default_colors()
+        self.board_gui.set_default_colors()
         self.state = states[0]
         for state in states[1:]:
-            action = state.get_latest_move()
             self.state = state
             self._update_gui()
             time.sleep(delay)
@@ -201,7 +263,7 @@ class ChessGUI(QMainWindow):
         print("It's over.")
 
     def load_game_trigger(self):
-        self.board.set_default_colors()
+        self.board_gui.set_default_colors()
         name = QtWidgets.QFileDialog.getOpenFileName(self, 'Load Game', options=QFileDialog.DontUseNativeDialog)
         print(name[0])
         trace = self.trace.load(name[0])
